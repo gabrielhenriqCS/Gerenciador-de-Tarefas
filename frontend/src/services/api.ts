@@ -1,77 +1,47 @@
-import type { Task, ApiResponse } from "../types";
+import axios, { AxiosResponse } from "axios";
+import { Task } from "../@types";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3333";
+export type CreateTaskInput = Omit<Task, "id">;
+export type UpdateTaskInput = Partial<Omit<Task, "id">>;
 
-async function request<T>(
-  endpoint: string,
-  options?: RequestInit
-): Promise<ApiResponse<T>> {
-  const response = await fetch(`${API_URL}${endpoint}`, {
-    headers: { "Content-Type": "application/json" },
-    ...options,
-  });
-
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.message || "Erro na requisição");
-  }
-
-  return data;
+export interface ApiResponse<T> {
+  success: boolean;
+  data: T;
+  message?: string;
+  total?: number;
 }
 
-export const tasksApi = {
-  list: (filters?: {
-    categoria?: string;
-    status?: string;
-    search?: string;
-  }): Promise<ApiResponse<Task[]>> => {
-    const params = new URLSearchParams();
-    if (filters?.categoria) params.append("categoria", filters.categoria);
-    if (filters?.status) params.append("status", filters.status);
-    if (filters?.search) params.append("search", filters.search);
+const api = axios.create({
+  baseURL: "http://localhost:8080/api", 
+  timeout: 5000,
+});
 
-    const query = params.toString();
-    return request<Task[]>(`/tasks${query ? `?${query}` : ""}`);
-  },
 
-  getById: (id: string): Promise<ApiResponse<Task>> =>
-    request<Task>(`/tasks/${id}`),
+export const createTask = (taskData: CreateTaskInput): Promise<AxiosResponse<ApiResponse<Task>>> => {
+  return api.post<ApiResponse<Task>>("/tasks", taskData);
+};
 
-  create: (data: {
-    titulo: string;
-    descricao?: string;
-    prazo: string;
-    categoria: string;
-  }): Promise<ApiResponse<Task>> =>
-    request<Task>("/tasks", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
 
-  update: (
-    id: string,
-    data: {
-      titulo: string;
-      descricao?: string;
-      prazo: string;
-      categoria: string;
-    }
-  ): Promise<ApiResponse<Task>> =>
-    request<Task>(`/tasks/${id}`, {
-      method: "PUT",
-      body: JSON.stringify(data),
-    }),
+export const listTasks = (): Promise<AxiosResponse<ApiResponse<Task[]>>> => {
+  return api.get<ApiResponse<Task[]>>("/tasks");
+};
 
-  updateStatus: (
-    id: string,
-    status: "NOVA" | "PENDENTE" | "CONCLUIDA"
-  ): Promise<ApiResponse<Task>> =>
-    request<Task>(`/tasks/${id}/status`, {
-      method: "PATCH",
-      body: JSON.stringify({ status }),
-    }),
 
-  delete: (id: string): Promise<void> =>
-    request(`/tasks/${id}`, { method: "DELETE" }).then(() => undefined),
+export const getTaskById = (id: string): Promise<AxiosResponse<ApiResponse<Task>>> => {
+  return api.get<ApiResponse<Task>>(`/tasks/${id}`);
+};
+
+
+export const updateTask = (id: string, taskData: UpdateTaskInput): Promise<AxiosResponse<ApiResponse<Task>>> => {
+  return api.put<ApiResponse<Task>>(`/tasks/${id}`, taskData);
+};
+
+
+export const updateTaskStatus = (id: string, status: Task["status"]): Promise<AxiosResponse<ApiResponse<Task>>> => {
+  return api.patch<ApiResponse<Task>>(`/tasks/${id}/status`, { status });
+};
+
+
+export const deleteTask = (id: string): Promise<AxiosResponse<void>> => {
+  return api.delete<void>(`/tasks/${id}`);
 };

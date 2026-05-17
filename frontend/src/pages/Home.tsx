@@ -1,8 +1,15 @@
 import { useState, useEffect } from "react";
 import { TaskForm } from "../components/TaskForm";
 import { TaskList } from "../components/TaskList";
-import { tasksApi } from "../services/api";
 import { CreateTaskFormData, Task } from "../@types";
+import { 
+  listTasks, 
+  createTask, 
+  updateTask, 
+  updateTaskStatus, 
+  deleteTask, 
+  CreateTaskInput
+} from "../services/api";
 
 export function Home() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -11,6 +18,7 @@ export function Home() {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+
   useEffect(() => {
     loadTasks();
   }, []);
@@ -18,23 +26,28 @@ export function Home() {
   async function loadTasks() {
     try {
       setIsLoading(true);
-      const response = await tasksApi.list();
-      setTasks(response.data);
+      const response = await listTasks();
+      
+      if (response.data.success) {
+        setTasks(response.data.data);
+      }
       setError(null);
     } catch (err) {
-      setError("Erro ao carregar tarefas");
+      setError("Erro ao carregar tarefas da API");
       console.error(err);
     } finally {
       setIsLoading(false);
     }
   }
 
-  async function handleCreateTask(formData: CreateTaskFormData) {
+  async function handleCreateTask(formData: CreateTaskInput) {
     try {
-      await tasksApi.create(formData);
-      await loadTasks();
-      setShowForm(false);
-      setEditingTask(null);
+      const response = await createTask(formData);
+      if (response.data.success) {
+        await loadTasks();
+        setShowForm(false);
+        setEditingTask(null);
+      }
     } catch (err) {
       setError("Erro ao criar tarefa");
       console.error(err);
@@ -43,32 +56,38 @@ export function Home() {
 
   async function handleUpdateTask(id: string, formData: CreateTaskFormData) {
     try {
-      await tasksApi.update(id, formData);
-      await loadTasks();
-      setShowForm(false);
-      setEditingTask(null);
+      const response = await updateTask(id, formData);
+      if (response.data.success) {
+        await loadTasks();
+        setShowForm(false);
+        setEditingTask(null);
+      }
     } catch (err) {
       setError("Erro ao atualizar tarefa");
       console.error(err);
     }
   }
 
-  async function handleToggleStatus(id: string, currentStatus: string) {
-    try {
-      const newStatus = currentStatus === "PENDENTE" ? "CONCLUIDA" : "PENDENTE";
-      await tasksApi.updateStatus(id, newStatus);
-      await loadTasks();
-    } catch (err) {
-      setError("Erro ao atualizar status");
-      console.error(err);
-    }
+  function handleToggleStatus(id: string, currentStatus: string) {
+    const newStatus = currentStatus === "PENDENTE" ? "CONCLUIDA" : "PENDENTE";
+
+    updateTaskStatus(id, newStatus)
+      .then((response) => {
+        if (response.data.success) {
+          loadTasks();
+        }
+      })
+      .catch((err) => {
+        setError("Erro ao atualizar status da tarefa");
+        console.error(err);
+      });
   }
 
   async function handleDeleteTask(id: string) {
-    if (!window.confirm("Tem certeza que deseja excluir?")) return;
+    if (!window.confirm("Tem certeza que deseja excluir esta tarefa?")) return;
     try {
-      await tasksApi.delete(id);
-      await loadTasks();
+      await deleteTask(id);
+      await loadTasks(); 
     } catch (err) {
       setError("Erro ao excluir tarefa");
       console.error(err);
@@ -89,23 +108,23 @@ export function Home() {
           <p className="text-slate-400">Gerencie suas tarefas de forma simples e eficiente</p>
         </div>
 
-        {/* Error Message */}
+       
         {error && (
           <div className="mb-6 p-4 bg-red-500/20 border border-red-500/50 rounded-lg text-red-300">
             {error}
           </div>
         )}
 
-        {/* Main Container */}
+      
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Form Section */}
+          
           {showForm && (
             <div className="lg:col-span-1">
               <TaskForm
                 task={editingTask}
                 onSubmit={(data) => editingTask ?
                   handleUpdateTask(editingTask.id, data as CreateTaskFormData) :
-                  handleCreateTask(data as CreateTaskFormData)
+                  handleCreateTask(data as CreateTaskInput)
                 }
                 onCancel={() => {
                   setShowForm(false);
@@ -115,7 +134,7 @@ export function Home() {
             </div>
           )}
 
-          {/* Tasks Section */}
+         
           <div className={showForm ? "lg:col-span-2" : "lg:col-span-3"}>
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-semibold text-white">

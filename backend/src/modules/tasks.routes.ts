@@ -19,7 +19,7 @@ export async function tasksRoutes(
   _options: FastifyPluginOptions,
 ): Promise<void> {
   app.post(
-    "/",
+    "/task",
     {
       preHandler: async (request, reply) => {
         const result = createTaskBodySchema.safeParse(request.body);
